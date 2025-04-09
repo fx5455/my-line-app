@@ -1,9 +1,10 @@
 // src/pages/ProductList.js
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, orderBy, limit, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import dayjs from 'dayjs';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -13,19 +14,23 @@ const ProductList = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
+  const [latestNotice, setLatestNotice] = useState(null);
+
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
+  // 🔸 商品データ
   useEffect(() => {
     const fetchProducts = async () => {
-      const querySnapshot = await getDocs(collection(db, 'products'));
-      const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await getDocs(collection(db, 'products'));
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProducts(items);
       setFiltered(items);
     };
     fetchProducts();
   }, []);
 
+  // 🔸 カテゴリデータ
   useEffect(() => {
     const fetchCategories = async () => {
       const snapshot = await getDocs(collection(db, 'categories'));
@@ -33,6 +38,24 @@ const ProductList = () => {
       setCategories(["すべて", ...categoryList]);
     };
     fetchCategories();
+  }, []);
+
+  // 🔸 お知らせ（最新1件）
+  useEffect(() => {
+    const fetchNotice = async () => {
+      const q = query(collection(db, 'notices'), orderBy('createdAt', 'desc'), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        const data = doc.data();
+        setLatestNotice({
+          id: doc.id,
+          title: data.title,
+          createdAt: data.createdAt?.toDate ? dayjs(data.createdAt.toDate()).format('YYYY/MM/DD') : ''
+        });
+      }
+    };
+    fetchNotice();
   }, []);
 
   const handleFilter = () => {
@@ -73,10 +96,23 @@ const ProductList = () => {
 
   return (
     <div className="p-4">
+      {/* 🔔 最新お知らせ */}
+      {latestNotice && (
+  <div className="mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 p-3">
+    <div className="flex justify-between items-center">
+      <p className="text-sm font-semibold">
+        最新のお知らせ: {latestNotice.title}（{latestNotice.createdAt}）
+      </p>
+      <a href="/notices" className="text-blue-600 underline text-sm ml-4">📄 お知らせ一覧</a>
+    </div>
+  </div>
+)}
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">商品一覧</h2>
       </div>
 
+      {/* 🔍 検索 */}
       <div className="flex flex-wrap gap-2 mb-4">
         <select
           value={selectedCategory}
@@ -112,6 +148,7 @@ const ProductList = () => {
         <button onClick={handleReset} className="bg-gray-500 text-white px-4 py-2 rounded">リセット</button>
       </div>
 
+      {/* 商品一覧 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {filtered.map((item) => {
           const { text, style } = getStockLabel(item.stockStatus);

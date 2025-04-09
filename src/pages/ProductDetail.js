@@ -60,6 +60,17 @@ const ProductDetail = () => {
           {text}
         </p>
 
+        {/* 商品説明追加 */}
+        {product.description && (
+          <div className="mt-4">
+            <h3 className="font-semibold mb-1">商品説明</h3>
+            <div
+            className="text-sm text-gray-700 whitespace-pre-line"
+            dangerouslySetInnerHTML={{ __html: product.description }}
+           />
+        </div>
+        )}
+
         <div className="mt-6">
           <label className="block mb-1">数量を入力：</label>
           <input

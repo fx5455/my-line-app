@@ -1,4 +1,3 @@
-// src/pages/OrderHistory.js
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
@@ -108,7 +107,6 @@ const OrderHistory = () => {
           onChange={(e) => setSite(e.target.value)}
           className="border p-2 w-40"
         />
-
         <button onClick={handleSearch} className="bg-blue-600 text-white px-4 py-2 rounded">
           🔍 検索
         </button>
@@ -120,31 +118,61 @@ const OrderHistory = () => {
       {filteredOrders.length === 0 ? (
         <p>該当する注文履歴がありません。</p>
       ) : (
-        filteredOrders.map(order => (
-          <div key={order.id} className="border rounded p-4 mb-4 shadow">
-            <div className="mb-2 text-sm text-gray-600">
-              注文日: {order.orderedAt?.toDate().toLocaleString()} ／ 注文番号: {order.id}
-            </div>
-            <div className="text-sm text-gray-700 mb-1">
-              担当者: {order.personName || '未入力'} ／ 現場名: {order.siteName || '未入力'} ／ 納品先: {order.deliveryLocation || '未入力'}
-            </div>
-            <div className="text-sm">
-              {order.items.map((item, idx) => (
-                <div key={idx} className="border-b py-1 flex justify-between">
-                  <div>
-                    <div className="font-bold">{item.name}</div>
-                    <div className="text-gray-500 text-sm">
-                      数量: {item.quantity} ／ 単価: ¥{item.price.toLocaleString()}
+        filteredOrders.map(order => {
+          const total = Array.isArray(order.items)
+            ? order.items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.price), 0)
+            : 0;
+
+          return (
+            <div key={order.id} className="border rounded p-4 mb-4 shadow">
+              <div className="mb-2 text-sm text-gray-600">
+                注文日: {order.orderedAt?.toDate().toLocaleString()} ／ 注文番号: {order.id}
+              </div>
+              <div className="text-sm text-gray-700 mb-1">
+                担当者: {order.personName || '未入力'} ／ 現場名: {order.siteName || '未入力'} ／ 納品先: {order.deliveryLocation || '未入力'}
+              </div>
+
+              {/* ✅ 注文ステータス */}
+              <div className="text-sm text-blue-600 font-bold mb-1">
+                ステータス: {order.status || '注文確認中'}
+              </div>
+
+              <div className="text-sm">
+                {order.items.map((item, idx) => (
+                  <div key={idx} className="border-b py-1 flex justify-between">
+                    <div>
+                      <div className="font-bold">{item.name}</div>
+                      <div className="text-gray-500 text-sm">
+                        数量: {item.quantity} ／ 単価: ￥{item.price.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      小計: ￥{(item.quantity * item.price).toLocaleString()}
                     </div>
                   </div>
-                  <div className="text-right">
-                    小計: ¥{(item.quantity * item.price).toLocaleString()}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {/* ✅ 合計金額表示 */}
+              <div className="text-right font-bold mt-2">
+                合計金額: ￥{total.toLocaleString()}
+              </div>
+
+              {/* ✅ 発注書ボタン */}
+              <button
+                onClick={() =>
+                  window.open(
+                    `https://us-central1-product-master-f5fb0.cloudfunctions.net/createInvoice?orderId=${order.id}`,
+                    '_blank'
+                  )
+                }
+                className="mt-3 text-sm text-blue-600 underline"
+              >
+                🧾 発注書を見る・送る
+              </button>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );

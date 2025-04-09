@@ -1,4 +1,3 @@
-// src/pages/Login.js
 import React, { useState } from 'react';
 import { db } from '../firebase';
 import {
@@ -7,7 +6,8 @@ import {
   where,
   getDocs,
   setDoc,
-  doc
+  doc,
+  getDoc
 } from 'firebase/firestore';
 
 const Login = ({ onLogin }) => {
@@ -15,13 +15,13 @@ const Login = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  const lineUserId = 'TEST-LINE-ID-123'; // ✅ 仮のLINE ID（後で置き換え）
+
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    const userId = 'TEST-LINE-ID'; // 実際は LINEログインで取得
-
     try {
-      // 🔍 ① 認証マスターを検索
+      // 🔍 authMaster から会社情報を取得
       const q = query(
         collection(db, 'authMaster'),
         where('companyCode', '==', companyCode),
@@ -36,21 +36,35 @@ const Login = ({ onLogin }) => {
 
       const data = snapshot.docs[0].data();
 
-      // ✅ ② users に LINEユーザーIDをドキュメントIDとして保存
-      await setDoc(doc(db, 'users', userId), {
-        userId,
-        companyCode,
-        companyName: data.companyName,
-        address: data.address || '',
-        tel: data.tel || '',
-        createdAt: new Date()
-      });
+      // 🔄 既存のユーザーデータ（isAdmin等）取得
+      const userRef = doc(db, 'users', lineUserId);
+      const existingSnap = await getDoc(userRef);
+      const existingData = existingSnap.exists() ? existingSnap.data() : {};
 
-      // 🔑 ③ ローカルストレージにユーザーID保存（自動ログイン対応）
-      localStorage.setItem('lineUserId', userId);
+      const isAdmin = data.isAdmin ?? existingData.isAdmin ?? false;
 
-      // 🎉 ログイン成功通知（親へ）
-      onLogin(data.companyName);
+      // ✅ Firestoreに保存（merge指定で上書き防止）
+      await setDoc(
+        userRef,
+        {
+          userId: lineUserId,
+          companyCode,
+          companyName: data.companyName,
+          address: data.address || '',
+          tel: data.tel || '',
+          createdAt: existingData.createdAt || new Date(),
+          isAdmin // ← ここ重要！
+        },
+        { merge: true }
+      );
+
+      // ✅ ローカルストレージに保存
+      localStorage.setItem('lineUserId', lineUserId);
+      localStorage.setItem('companyName', data.companyName);
+      localStorage.setItem('isAdmin', isAdmin ? 'true' : 'false');
+
+      // 🎉 親に通知
+      onLogin(data.companyName, isAdmin);
     } catch (err) {
       console.error('ログイン失敗:', err);
       setError('通信エラーが発生しました');
@@ -76,7 +90,10 @@ const Login = ({ onLogin }) => {
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded w-full">
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
+        >
           ログイン
         </button>
       </form>
