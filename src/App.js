@@ -1,3 +1,4 @@
+// src/App.js
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 
@@ -11,6 +12,9 @@ import NoticeList from './pages/NoticeList';
 import Admin from './pages/Admin';
 import AdminOrderStatus from './pages/admin/AdminOrderStatus';
 import AdminNoticeManager from './pages/admin/AdminNoticeManager';
+import AdminProductForm from './pages/admin/AdminProductForm'; // ✅ 商品登録ページ追加
+import AdminProductManager from './pages/admin/AdminProductManager'; // ✅ 商品編集・削除ページ追加
+import SavedItemsPage from './pages/SavedItemsPage'; // ✅ 後で買うページ追加
 
 import { CartProvider } from './context/CartContext';
 
@@ -66,6 +70,7 @@ const App = () => {
                     <Link to="/">🏠 商品一覧</Link>
                     <Link to="/history">📋 注文履歴</Link>
                     <Link to="/cart">🛒 カート</Link>
+                    <Link to="/saved">💾 後で買う</Link>
                     <Link to="/notices">📄 お知らせ一覧</Link>
                     {isAdmin && <Link to="/admin">🔧 管理画面</Link>}
                   </div>
@@ -82,9 +87,12 @@ const App = () => {
                 <Route path="/complete" element={<OrderComplete />} />
                 <Route path="/history" element={<OrderHistory />} />
                 <Route path="/notices" element={<NoticeList />} />
+                <Route path="/saved" element={<SavedItemsPage />} /> {/* ✅ 後で買うページ */}
                 <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
                 <Route path="/admin/orders" element={<AdminRoute><AdminOrderStatus /></AdminRoute>} />
                 <Route path="/admin/notices" element={<AdminRoute><AdminNoticeManager /></AdminRoute>} />
+                <Route path="/admin/products" element={<AdminRoute><AdminProductForm /></AdminRoute>} />
+                <Route path="/admin/products/manage" element={<AdminRoute><AdminProductManager /></AdminRoute>} />
               </Routes>
             </>
           ) : (

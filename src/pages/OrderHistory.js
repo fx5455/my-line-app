@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import dayjs from 'dayjs';
+import { Link } from 'react-router-dom'; // ✅ 商品詳細へのリンク追加
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
@@ -133,15 +134,21 @@ const OrderHistory = () => {
               </div>
 
               {/* ✅ 注文ステータス */}
-              <div className="text-sm text-blue-600 font-bold mb-1">
+              <div className="text-sm text-red-600 font-bold mb-1">
                 ステータス: {order.status || '注文確認中'}
               </div>
 
+              {/* ✅ 商品一覧 */}
               <div className="text-sm">
                 {order.items.map((item, idx) => (
                   <div key={idx} className="border-b py-1 flex justify-between">
                     <div>
-                      <div className="font-bold">{item.name}</div>
+                      <div className="font-bold">
+                        {/* ✅ 商品名にリンクを追加 */}
+                        <Link to={`/product/${item.id}`} className="text-blue-600 underline">
+                          {item.name}
+                        </Link>
+                      </div>
                       <div className="text-gray-500 text-sm">
                         数量: {item.quantity} ／ 単価: ￥{item.price.toLocaleString()}
                       </div>

@@ -1,11 +1,26 @@
+// src/pages/CartPage.js
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom'; // ✅ Link を追加
 import { useCart } from '../context/CartContext';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc
+} from 'firebase/firestore';
 
 const CartPage = ({ companyName }) => {
-  const { cartItems, removeFromCart, clearCart, updateQuantity } = useCart();
+  const {
+    cartItems,
+    removeFromCart,
+    clearCart,
+    updateQuantity,
+    saveForLater,
+    savedItems = [],
+    moveToCart
+  } = useCart();
   const navigate = useNavigate();
 
   const [deliveryOption, setDeliveryOption] = useState('会社入れ');
@@ -20,7 +35,24 @@ const CartPage = ({ companyName }) => {
       const deliveryLocation =
         deliveryOption === 'その他' ? customAddress : deliveryOption;
 
-      const userId = localStorage.getItem('lineUserId'); // ログイン済ユーザーID
+      const userId = localStorage.getItem('lineUserId');
+
+      const enrichedItems = await Promise.all(
+        cartItems.map(async (item) => {
+          const productRef = doc(db, 'products', item.id);
+          const productSnap = await getDoc(productRef);
+          const productData = productSnap.exists() ? productSnap.data() : {};
+
+          return {
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: Number(productData.price ?? item.price ?? 0),
+            supplier: productData.supplier || '',
+            supplierPrice: Number(productData.supplierPrice ?? 0)
+          };
+        })
+      );
 
       const docRef = await addDoc(collection(db, 'orders'), {
         companyName,
@@ -28,13 +60,9 @@ const CartPage = ({ companyName }) => {
         deliveryLocation,
         siteName,
         personName,
-        items: cartItems.map(item => ({
-          productId: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        })),
-        orderedAt: serverTimestamp()
+        items: enrichedItems,
+        orderedAt: serverTimestamp(),
+        status: '注文確認中'
       });
 
       clearCart();
@@ -45,7 +73,7 @@ const CartPage = ({ companyName }) => {
     }
   };
 
-  if (cartItems.length === 0) {
+  if (cartItems.length === 0 && savedItems.length === 0) {
     return (
       <div className="p-4">
         <h2 className="text-xl font-bold">🛒 カート</h2>
@@ -63,9 +91,7 @@ const CartPage = ({ companyName }) => {
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-bold">🛒 カート内容</h2>
-        </div>
+        <h2 className="text-xl font-bold">🛒 カート内容</h2>
         <button
           onClick={() => navigate('/')}
           className="text-sm text-blue-600 underline"
@@ -74,11 +100,16 @@ const CartPage = ({ companyName }) => {
         </button>
       </div>
 
+      {/* カート商品 */}
       {cartItems.map(item => (
         <div key={item.id} className="border p-4 rounded mb-2 shadow">
           <div className="flex justify-between">
             <div>
-              <p className="font-bold">{item.name}</p>
+              <p className="font-bold">
+                <Link to={`/product/${item.id}`} className="text-blue-600 underline">
+                  {item.name}
+                </Link>
+              </p>
               <p className="text-sm text-gray-500">単価: ¥{item.price.toLocaleString()}</p>
               <div className="flex items-center mt-1">
                 <button
@@ -96,47 +127,28 @@ const CartPage = ({ companyName }) => {
             <div className="text-right">
               <p>小計: ¥{(item.price * item.quantity).toLocaleString()}</p>
               <button onClick={() => removeFromCart(item.id)} className="text-red-600 mt-2">🗑 削除</button>
+              <button onClick={() => saveForLater(item)} className="text-yellow-600 mt-2 ml-4">🕒 後で買う</button>
             </div>
           </div>
         </div>
       ))}
 
-      <hr className="my-4" />
-
-      {/* 納品先の選択 */}
+      {/* 納品情報 */}
       <div className="mb-4">
         <label className="block font-bold mb-1">納品方法を選択：</label>
         <div className="flex flex-col space-y-1">
-          <label>
-            <input
-              type="radio"
-              value="お店引取"
-              checked={deliveryOption === 'お店引取'}
-              onChange={() => setDeliveryOption('お店引取')}
-              className="mr-2"
-            />
-            お店引取
-          </label>
-          <label>
-            <input
-              type="radio"
-              value="会社入れ"
-              checked={deliveryOption === '会社入れ'}
-              onChange={() => setDeliveryOption('会社入れ')}
-              className="mr-2"
-            />
-            会社入れ
-          </label>
-          <label>
-            <input
-              type="radio"
-              value="その他"
-              checked={deliveryOption === 'その他'}
-              onChange={() => setDeliveryOption('その他')}
-              className="mr-2"
-            />
-            その他（現場など）
-          </label>
+          {['お店引取', '会社入れ', 'その他'].map(option => (
+            <label key={option}>
+              <input
+                type="radio"
+                value={option}
+                checked={deliveryOption === option}
+                onChange={() => setDeliveryOption(option)}
+                className="mr-2"
+              />
+              {option}
+            </label>
+          ))}
         </div>
         {deliveryOption === 'その他' && (
           <input
@@ -149,7 +161,6 @@ const CartPage = ({ companyName }) => {
         )}
       </div>
 
-      {/* 現場名 */}
       <div className="mb-4">
         <label className="block font-bold mb-1">現場名：</label>
         <input
@@ -161,7 +172,6 @@ const CartPage = ({ companyName }) => {
         />
       </div>
 
-      {/* 担当者 */}
       <div className="mb-4">
         <label className="block font-bold mb-1">担当者：</label>
         <input
@@ -175,12 +185,39 @@ const CartPage = ({ companyName }) => {
 
       <p className="text-right text-lg font-bold">合計: ¥{total.toLocaleString()}</p>
 
+      {/* 発注ボタン */}
       <button
         onClick={handleOrder}
         className="bg-blue-600 text-white px-6 py-2 rounded mt-4 w-full"
       >
         発注する
       </button>
+
+      {/* 🕒 後で買う商品 */}
+      {savedItems.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-2">🕒 後で買う商品</h3>
+          {savedItems.map(item => (
+            <div key={item.id} className="border p-4 rounded mb-2 bg-gray-50">
+              <div className="flex justify-between">
+                <div>
+                  <p className="font-bold">
+                    <Link to={`/product/${item.id}`} className="text-blue-600 underline">
+                      {item.name}
+                    </Link>
+                  </p>
+                  <p className="text-sm text-gray-500">単価: ¥{item.price.toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <button onClick={() => moveToCart(item)} className="text-green-600">
+                    カートに戻す
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

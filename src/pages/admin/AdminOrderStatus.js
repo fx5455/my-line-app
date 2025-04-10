@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
 
-const statusOptions = ['注文確認中', '手配中', '欠品中', '出荷済', '納品済'];
+const statusOptions = ['注文確認中', '手配中', '欠品中', '出荷済', '納品済', '起伝済み'];
 
 const AdminOrderStatus = () => {
   const [orders, setOrders] = useState([]);
@@ -13,7 +13,6 @@ const AdminOrderStatus = () => {
   const [statusFilter, setStatusFilter] = useState('すべて');
   const [productKeyword, setProductKeyword] = useState('');
 
-  // 🔄 注文データ取得
   useEffect(() => {
     const fetchOrders = async () => {
       const q = query(collection(db, 'orders'), orderBy('orderedAt', 'desc'));
@@ -23,10 +22,10 @@ const AdminOrderStatus = () => {
       setFilteredOrders(results);
       setLoading(false);
     };
+
     fetchOrders();
   }, []);
 
-  // 🔍 フィルターロジック
   const handleFilter = useCallback(() => {
     const keyword = searchKeyword.trim();
     const product = productKeyword.trim();
@@ -45,20 +44,20 @@ const AdminOrderStatus = () => {
       const matchProduct =
         product === '' ||
         (Array.isArray(order.items) &&
-          order.items.some(item => item.name.includes(product)));
+          order.items.some(item =>
+            item.name.includes(product) || (item.id && item.id.includes(product))
+          ));
 
       return matchKeyword && matchStatus && matchProduct;
     });
 
     setFilteredOrders(result);
-  }, [orders, searchKeyword, statusFilter, productKeyword]);
+  }, [searchKeyword, statusFilter, productKeyword, orders]);
 
-  // 🔁 フィルター更新時に再実行
   useEffect(() => {
     handleFilter();
   }, [handleFilter]);
 
-  // ✅ ステータス変更
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       const ref = doc(db, 'orders', orderId);
@@ -84,20 +83,19 @@ const AdminOrderStatus = () => {
     <div className="p-4 max-w-6xl mx-auto">
       <h2 className="text-xl font-bold mb-4">🛠 管理者：注文ステータス管理</h2>
 
-      {/* 🔍 フィルター */}
       <div className="bg-gray-50 border p-4 rounded mb-6">
         <h3 className="text-sm font-semibold mb-2 text-gray-700">🔍 注文検索／絞り込み</h3>
         <div className="flex flex-wrap gap-2 items-center">
           <input
             type="text"
-            placeholder="注文番号・現場名・納品先で検索"
+            placeholder="注文番号・現場名・納品先・商品IDで検索"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
             className="border p-2 w-64"
           />
           <input
             type="text"
-            placeholder="商品名で検索"
+            placeholder="商品名・商品IDで検索"
             value={productKeyword}
             onChange={(e) => setProductKeyword(e.target.value)}
             className="border p-2 w-64"
@@ -121,7 +119,6 @@ const AdminOrderStatus = () => {
         </div>
       </div>
 
-      {/* ✅ 注文リスト */}
       {loading ? (
         <p>読み込み中...</p>
       ) : (
@@ -131,14 +128,19 @@ const AdminOrderStatus = () => {
               注文番号: {order.id} ／ 注文日: {order.orderedAt?.toDate().toLocaleString()}
             </div>
             <div className="text-sm text-gray-700 mb-2">
-              会社: {order.companyName || '不明'} ／ 担当者: {order.personName || '未入力'}
+              会社: {order.companyName || '不明'} ／ 担当者: {order.personName || '未入力'} ／ ユーザーID: {order.userId || '不明'}
             </div>
 
             <div className="text-sm mb-2">
               {order.items.map((item, idx) => (
-                <div key={idx} className="border-b py-1 flex justify-between">
-                  <span>{item.name}</span>
-                  <span>数量: {item.quantity}</span>
+                <div key={idx} className="border-b py-1">
+                  <div className="flex justify-between">
+                    <span>{item.name}</span>
+                    <span>数量: {item.quantity}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    商品ID: {item.id || '不明'} ／ 仕入元: {item.supplier || '不明'} ／ 仕入価格: ￥{Number(item.supplierPrice || 0).toLocaleString()} ／ 売価: ￥{Number(item.price || 0).toLocaleString()}
+                  </div>
                 </div>
               ))}
             </div>

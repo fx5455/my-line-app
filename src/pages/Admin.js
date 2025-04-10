@@ -22,6 +22,18 @@ const Admin = () => {
         >
           📣 お知らせ管理
         </button>
+        <button
+          onClick={() => navigate('/admin/products')}
+          className="block w-full text-left bg-purple-600 text-white px-4 py-2 rounded"
+        >
+          🛠 商品登録
+        </button>
+        <button
+          onClick={() => navigate('/admin/products/manage')}
+          className="block w-full text-left bg-yellow-600 text-white px-4 py-2 rounded"
+        >
+          ✏️ 商品編集・削除
+        </button>
       </div>
     </div>
   );
